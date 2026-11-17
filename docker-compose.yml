@@ -1,0 +1,14 @@
+# Optional: a local Postgres for development. Run: docker compose up -d
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: cohost
+      POSTGRES_PASSWORD: cohost
+      POSTGRES_DB: cohost
+    ports:
+      - "5432:5432"
+    volumes:
+      - cohost-data:/var/lib/postgresql/data
+volumes:
+  cohost-data:
