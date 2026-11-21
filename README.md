@@ -56,3 +56,21 @@ Sign in with any email address. The link appears on the page, so click "Sign in 
 ## Updating the database after new code
 
 When a new build step adds a column or table, run `npm run db:migrate` again. It is safe to run any number of times and keeps your existing events. (The idea board on each event needs this once.)
+
+## Tests
+
+`npm test` runs the tests. Most need nothing but Node.
+
+The database tests (photos, events, sign-in) run only when `TEST_DATABASE_URL` points at a
+**separate test database**, and they refuse any database whose name doesn't contain "test", so
+they can never touch your real events. Without it they skip themselves.
+
+To run them locally with the Docker database from `docker-compose.yml`:
+
+```
+docker compose up -d
+docker compose exec db createdb -U cohost cohost_test
+TEST_DATABASE_URL=postgres://cohost:cohost@localhost:5432/cohost_test npm test
+```
+
+GitHub runs all of them on every push (see `.github/workflows/ci.yml`).
