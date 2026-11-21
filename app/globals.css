@@ -460,3 +460,19 @@ body main.quiet-page .folder-inside-label,.board-hint{display:none}
 
 /* My events / Sign out match "THE PLANNING FILE": Arial, small, spaced capitals */
 .header-nav .contents-button{font-family:Arial,sans-serif;font-style:normal;font-weight:400;font-size:9px;letter-spacing:2px;text-transform:uppercase}
+
+/* ===== "What should we plan?" ===== */
+body main.quiet-page .guided fieldset.plan-opts{border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:7px;min-width:0}
+body main.quiet-page .guided .plan-opt{
+  display:flex;align-items:flex-start;gap:12px;margin:0;padding:10px 13px;cursor:pointer;text-transform:none;letter-spacing:normal;font-weight:400;
+  border:1.5px solid #d9cfb6;border-radius:4px;background:#fbf7ea;transition:background .15s,border-color .15s;
+}
+body main.quiet-page .guided .plan-opt:hover{background:#f6efd9}
+body main.quiet-page .guided .plan-opt.on{border-color:#8a7d5c;background:#f3ead0}
+body main.quiet-page .guided .plan-opt:focus-within{outline:2px solid #8a7d5c;outline-offset:2px}
+body main.quiet-page .guided .plan-opt input{flex:none;width:18px;height:18px;margin:2px 0 0;padding:0;accent-color:#5a4f38;cursor:pointer}
+body main.quiet-page .guided .plan-opt b{display:block;font:700 14px Arial,sans-serif;color:#3d382e;text-transform:none;letter-spacing:normal}
+body main.quiet-page .guided .plan-opt small{display:block;margin-top:2px;font:italic 12px/1.35 Georgia,serif;color:#7a6a44;text-transform:none;letter-spacing:normal}
+body main.quiet-page .guided .plan-kinds{margin:-1px 0 2px 31px;grid-template-columns:repeat(4,1fr);gap:6px}
+body main.quiet-page .guided .plan-kinds .choice{padding-left:8px;padding-right:8px;white-space:nowrap}
+@media(max-width:820px){body main.quiet-page .guided .plan-kinds{grid-template-columns:1fr 1fr;margin-left:0}}

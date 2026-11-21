@@ -57,6 +57,16 @@ describe.skipIf(!dbEnabled)("events, with a real database", () => {
     expect(input.collage).toEqual({ occasion: "Birthday", vibes: ["Cozy"], pos: { title: { x: 0.2, y: 0.3, r: -2 } } });
   });
 
+  it("remembers what the host asked us to plan", async () => {
+    const choices = { menu: true, menuKinds: ["Snacks", "Drinks"], shopping: true, tasks: false };
+    const { id } = await app.createEvent(owner, cleanEvent({ title: "Plan choices", planChoices: choices }));
+    expect(app.rowToInput((await app.getEvent(id, owner))!).planChoices).toEqual(choices);
+
+    // Changing them later is saved too.
+    await app.updateEvent(id, owner, 1, cleanEvent({ title: "Plan choices", planChoices: { ...choices, tasks: true } }));
+    expect(app.rowToInput((await app.getEvent(id, owner))!).planChoices.tasks).toBe(true);
+  });
+
   it("protects against two open tabs overwriting each other (version check)", async () => {
     const { id, version } = await app.createEvent(owner, cleanEvent({ title: "Versioned" }));
 

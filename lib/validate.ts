@@ -1,4 +1,5 @@
 import { cleanCollage, EMPTY_COLLAGE, type Collage } from "./collage";
+import { cleanPlanChoices, EMPTY_PLAN, type PlanChoices } from "./plan";
 
 // The details a host can save about an event. Everything is a string here because
 // that is what form fields give us; validate() turns them into the right types.
@@ -13,6 +14,7 @@ export type EventInput = {
   budget: string; // dollars, up to 2 decimals, or ""
   notes: string;
   collage: Collage; // the idea board: occasion, vibes and where each piece sits
+  planChoices: PlanChoices; // what to plan: menu, shopping list, tasks
 };
 
 export const EMPTY_EVENT: EventInput = {
@@ -26,6 +28,7 @@ export const EMPTY_EVENT: EventInput = {
   budget: "",
   notes: "",
   collage: EMPTY_COLLAGE,
+  planChoices: EMPTY_PLAN,
 };
 
 export type CleanEvent = {
@@ -39,6 +42,7 @@ export type CleanEvent = {
   budget: string | null; // kept as text so money stays exact
   notes: string;
   collage: Collage;
+  planChoices: PlanChoices;
 };
 
 export function validate(input: EventInput): { value: CleanEvent } | { error: string } {
@@ -89,6 +93,7 @@ export function validate(input: EventInput): { value: CleanEvent } | { error: st
   const timeZone = input.timeZone.trim().slice(0, 64) || null;
 
   const collage = cleanCollage(input.collage);
+  const planChoices = cleanPlanChoices(input.planChoices);
 
-  return { value: { title, description, eventDate, eventTime, timeZone, location, headcount, budget, notes, collage } };
+  return { value: { title, description, eventDate, eventTime, timeZone, location, headcount, budget, notes, collage, planChoices } };
 }

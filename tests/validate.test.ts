@@ -91,6 +91,10 @@ describe("validate: time zone and idea board", () => {
     expect(valueOf({ timeZone: "x".repeat(200) }).timeZone).toHaveLength(64);
     expect(valueOf({ timeZone: "" }).timeZone).toBeNull();
   });
+  it("cleans the plan choices on every save", () => {
+    const v = valueOf({ planChoices: { menu: true, menuKinds: ["Snacks", "Sushi"], shopping: true, tasks: "yes" } as never });
+    expect(v.planChoices).toEqual({ menu: true, menuKinds: ["Snacks"], shopping: true, tasks: false });
+  });
   it("cleans the idea board on every save", () => {
     const messy = { occasion: "x".repeat(100), vibes: ["Cozy", "Cozy", 7], pos: { "<script>": { x: 1, y: 1, r: 1 } } };
     const v = valueOf({ collage: messy as never });

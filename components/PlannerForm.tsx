@@ -13,13 +13,14 @@ import {
 } from "react";
 import { saveEvent, type SaveResult } from "@/app/events/actions";
 import { MAX_PHOTOS, OCCASIONS, VIBES, defaultPos, type Photo, type PiecePos } from "@/lib/collage";
+import { MENU_KINDS, hasPlanChoices } from "@/lib/plan";
 import { EMPTY_EVENT, type EventInput } from "@/lib/validate";
 
 type Initial = { id: string; version: number; input: EventInput; photos?: Photo[] };
 
-/** Eight questions, then a "saved" page. */
-const LAST = 8;
-const DOT_LABELS = ["", "Name", "Occasion", "Vibe", "Size", "When", "Where", "Story", "Inspiration"];
+/** Nine questions, then a "saved" page. */
+const LAST = 9;
+const DOT_LABELS = ["", "Name", "Occasion", "Vibe", "Size", "When", "Where", "Story", "Inspiration", "Plan"];
 
 const EXAMPLE: EventInput = {
   ...EMPTY_EVENT,
@@ -304,6 +305,15 @@ export default function PlannerForm({ initial }: { initial?: Initial }) {
       const vibes = has ? p.collage.vibes.filter((x) => x !== v) : [...p.collage.vibes, v].slice(0, 6);
       return { ...p, collage: { ...p.collage, vibes } };
     });
+  const setPlan = (patch: Partial<EventInput["planChoices"]>) =>
+    setF((p) => ({ ...p, planChoices: { ...p.planChoices, ...patch } }));
+  const toggleMenuKind = (k: string) =>
+    setF((p) => {
+      const has = p.planChoices.menuKinds.includes(k);
+      const menuKinds = has ? p.planChoices.menuKinds.filter((x) => x !== k) : [...p.planChoices.menuKinds, k];
+      // Un-picking the last kind turns the menu off, so a menu is never left empty.
+      return { ...p, planChoices: { ...p.planChoices, menuKinds, menu: menuKinds.length > 0 } };
+    });
   const setPiecePos = (key: string, pos: PiecePos) =>
     setF((p) => ({ ...p, collage: { ...p.collage, pos: { ...p.collage.pos, [key]: pos } } }));
 
@@ -493,6 +503,7 @@ export default function PlannerForm({ initial }: { initial?: Initial }) {
     6: !!f.location.trim(),
     7: !!(f.description.trim() || f.notes.trim()),
     8: photos.length > 0,
+    9: hasPlanChoices(f.planChoices),
   };
 
   const money = f.budget ? Number(f.budget).toLocaleString("en-US", { style: "currency", currency: "USD" }) : "";
@@ -508,6 +519,13 @@ export default function PlannerForm({ initial }: { initial?: Initial }) {
   ]
     .filter(Boolean)
     .join("\n");
+
+  const planBits = [
+    f.planChoices.menu && `menu (${f.planChoices.menuKinds.join(", ").toLowerCase()})`,
+    f.planChoices.shopping && "shopping list",
+    f.planChoices.tasks && "tasks",
+  ].filter(Boolean);
+  const factsWithPlan = planBits.length ? `${facts}\nPlanning: ${planBits.join(", ")}` : facts;
 
   const errorBox = error && (
     <p className="form-error" role="alert">
@@ -740,6 +758,56 @@ export default function PlannerForm({ initial }: { initial?: Initial }) {
             </div>
           </>
         );
+      case 9:
+        return (
+          <>
+            <h2 tabIndex={-1}>What should we plan?</h2>
+            <p className="intro">Check what you&rsquo;d like help with. We only suggest what you ask for.</p>
+            <fieldset className="plan-opts">
+              <legend className="sr-only">What to plan</legend>
+
+              <label className={`plan-opt${f.planChoices.menu ? " on" : ""}`}>
+                <input
+                  type="checkbox"
+                  checked={f.planChoices.menu}
+                  onChange={(e) => setPlan({ menu: e.target.checked, menuKinds: e.target.checked ? (f.planChoices.menuKinds.length ? f.planChoices.menuKinds : ["Full meal"]) : [] })}
+                />
+                <span>
+                  <b>Generate a menu</b>
+                  <small>Matched to your vibe, and to any food photos you added.</small>
+                </span>
+              </label>
+              {f.planChoices.menu && (
+                <div className="choice-grid plan-kinds" role="group" aria-label="Kind of menu">
+                  {MENU_KINDS.map((k) => {
+                    const on = f.planChoices.menuKinds.includes(k);
+                    return (
+                      <button key={k} type="button" className={`choice${on ? " on" : ""}`} aria-pressed={on} onClick={() => toggleMenuKind(k)}>
+                        {k}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              <label className={`plan-opt${f.planChoices.shopping ? " on" : ""}`}>
+                <input type="checkbox" checked={f.planChoices.shopping} onChange={(e) => setPlan({ shopping: e.target.checked })} />
+                <span>
+                  <b>Generate a shopping list</b>
+                  <small>Decor, supplies and food, with links and prices, kept within your budget.</small>
+                </span>
+              </label>
+
+              <label className={`plan-opt${f.planChoices.tasks ? " on" : ""}`}>
+                <input type="checkbox" checked={f.planChoices.tasks} onChange={(e) => setPlan({ tasks: e.target.checked })} />
+                <span>
+                  <b>Give me tasks</b>
+                  <small>A to-do list with dates, built from the menu and shopping list.</small>
+                </span>
+              </label>
+            </fieldset>
+          </>
+        );
       default:
         return null;
     }
@@ -796,7 +864,7 @@ export default function PlannerForm({ initial }: { initial?: Initial }) {
                 <span />
               )}
               <button className="primary" type="submit" disabled={pending}>
-                {pending ? "Saving…" : step === LAST ? "Finish" : step === 1 || hasValue[step] ? "Next" : "Skip"} <span>{step === LAST ? "✧" : "→"}</span>
+                {pending ? "Saving…" : step === LAST ? (hasValue[LAST] ? "Start planning" : "Not now") : step === 1 || hasValue[step] ? "Next" : "Skip"} <span>{step === LAST ? "✧" : "→"}</span>
               </button>
             </div>
           </form>
@@ -808,12 +876,12 @@ export default function PlannerForm({ initial }: { initial?: Initial }) {
             <div className="summary">
               <span>YOUR EVENT BRIEF</span>
               <p>{f.title}</p>
-              <div id="facts">{facts}</div>
+              <div id="facts">{factsWithPlan}</div>
             </div>
 
             <p className="demo-notice">
-              Menu, shopping list and tasks come in the next build step. Nothing here is generated yet, and nothing is
-              shared with anyone.
+              Menu, shopping list and tasks come in the next build step. Your choices are saved, so they&rsquo;ll be
+              ready then. Nothing here is generated yet, and nothing is shared with anyone.
             </p>
 
             <div className="actions">

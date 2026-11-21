@@ -1,5 +1,6 @@
 import { pool } from "./db";
 import { cleanCollage } from "./collage";
+import { cleanPlanChoices } from "./plan";
 import type { CleanEvent, EventInput } from "./validate";
 
 export type EventRow = {
@@ -16,6 +17,7 @@ export type EventRow = {
   status: "draft" | "published" | "cancelled";
   plan_version: number;
   collage: unknown; // jsonb; cleaned again before use
+  plan_choices: unknown; // jsonb; cleaned again before use
 };
 
 // Dates and times are formatted in SQL so they never shift with a time zone.
@@ -25,7 +27,7 @@ const COLUMNS = `
   to_char(e.event_time, 'HH24:MI') as event_time,
   e.time_zone, e.location, e.planning_headcount,
   e.budget_amount::text as budget_amount,
-  e.notes, e.status, e.plan_version, e.collage`;
+  e.notes, e.status, e.plan_version, e.collage, e.plan_choices`;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -63,10 +65,10 @@ export async function createEvent(userId: string, e: CleanEvent): Promise<{ id: 
     const { rows } = await client.query(
       `insert into events
          (host_id, title, description, event_date, event_time, time_zone,
-          location, planning_headcount, budget_amount, notes, collage)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb)
+          location, planning_headcount, budget_amount, notes, collage, plan_choices)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12::jsonb)
        returning id, plan_version`,
-      [userId, e.title, e.description, e.eventDate, e.eventTime, e.timeZone, e.location, e.headcount, e.budget, e.notes, JSON.stringify(e.collage)],
+      [userId, e.title, e.description, e.eventDate, e.eventTime, e.timeZone, e.location, e.headcount, e.budget, e.notes, JSON.stringify(e.collage), JSON.stringify(e.planChoices)],
     );
     await client.query(
       "insert into event_members (event_id, user_id, role) values ($1, $2, 'host')",
@@ -96,11 +98,11 @@ export async function updateEvent(
   const { rows } = await pool.query(
     `update events set
         title = $4, description = $5, event_date = $6, event_time = $7, time_zone = $8,
-        location = $9, planning_headcount = $10, budget_amount = $11, notes = $12, collage = $13::jsonb,
+        location = $9, planning_headcount = $10, budget_amount = $11, notes = $12, collage = $13::jsonb, plan_choices = $14::jsonb,
         plan_version = plan_version + 1, updated_at = now()
       where id = $1 and host_id = $2 and plan_version = $3
       returning plan_version`,
-    [id, userId, expectedVersion, e.title, e.description, e.eventDate, e.eventTime, e.timeZone, e.location, e.headcount, e.budget, e.notes, JSON.stringify(e.collage)],
+    [id, userId, expectedVersion, e.title, e.description, e.eventDate, e.eventTime, e.timeZone, e.location, e.headcount, e.budget, e.notes, JSON.stringify(e.collage), JSON.stringify(e.planChoices)],
   );
   return rows[0]?.plan_version ?? null;
 }
@@ -118,5 +120,6 @@ export function rowToInput(r: EventRow): EventInput {
     budget: r.budget_amount ?? "",
     notes: r.notes,
     collage: cleanCollage(r.collage),
+    planChoices: cleanPlanChoices(r.plan_choices),
   };
 }

@@ -47,6 +47,9 @@ create table if not exists events (
 -- The idea board on the left page: occasion, vibes and where each piece was dragged.
 alter table events add column if not exists collage jsonb not null default '{}'::jsonb;
 
+-- What the host asked us to plan: menu (and which kinds), shopping list, tasks.
+alter table events add column if not exists plan_choices jsonb not null default '{}'::jsonb;
+
 create index if not exists events_host_idx on events (host_id, updated_at desc);
 
 -- One row per person per event. The host gets one when the event is created.
