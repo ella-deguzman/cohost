@@ -10,6 +10,10 @@ export type Collage = {
   pos: Record<string, PiecePos>;
 };
 
+/** An inspiration photo on the board. The image itself is served from /photos/<id>. */
+export type Photo = { id: string; w: number; h: number };
+export const MAX_PHOTOS = 8;
+
 export const EMPTY_COLLAGE: Collage = { occasion: "", vibes: [], pos: {} };
 
 export const OCCASIONS = ["Birthday", "Dinner party", "Brunch", "Housewarming", "Holiday", "Just because"];
@@ -27,15 +31,27 @@ const START: Record<string, PiecePos> = {
   notes: { x: 0.12, y: 0.78, r: -2 },
 };
 const VIBE_TILTS = [-3, 2, -1, 3, -2, 1, 2, -3];
+/** Where the first few photos land; the host drags them wherever they like. */
+const PHOTO_START: PiecePos[] = [
+  { x: 0.66, y: 0.6, r: 4 },
+  { x: 0.34, y: 0.66, r: -5 },
+  { x: 0.7, y: 0.06, r: -3 },
+  { x: 0.02, y: 0.04, r: 5 },
+  { x: 0.4, y: 0.04, r: 2 },
+  { x: 0.76, y: 0.3, r: -6 },
+  { x: 0.2, y: 0.5, r: 3 },
+  { x: 0.5, y: 0.45, r: -2 },
+];
 
-export function defaultPos(key: string, vibeIndex = 0): PiecePos {
+export function defaultPos(key: string, index = 0): PiecePos {
   if (key.startsWith("vibe:")) {
     return {
-      x: 0.06 + (vibeIndex % 3) * 0.21,
-      y: 0.33 + Math.floor(vibeIndex / 3) * 0.055,
-      r: VIBE_TILTS[vibeIndex % VIBE_TILTS.length],
+      x: 0.06 + (index % 3) * 0.21,
+      y: 0.33 + Math.floor(index / 3) * 0.055,
+      r: VIBE_TILTS[index % VIBE_TILTS.length],
     };
   }
+  if (key.startsWith("photo:")) return PHOTO_START[index % PHOTO_START.length];
   return START[key] ?? { x: 0.2, y: 0.2, r: 0 };
 }
 
@@ -43,7 +59,7 @@ function num(v: unknown, lo: number, hi: number, fallback: number): number {
   return typeof v === "number" && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : fallback;
 }
 
-const KEY = /^[a-z]{1,12}(:[A-Za-z0-9 '-]{1,30})?$/;
+const KEY = /^[a-z]{1,12}(:[A-Za-z0-9 '-]{1,40})?$/;
 
 /**
  * Turns anything the browser sends into a safe collage. The server runs this on every
@@ -65,7 +81,7 @@ export function cleanCollage(raw: unknown): Collage {
 
   const pos: Record<string, PiecePos> = {};
   if (o.pos && typeof o.pos === "object") {
-    for (const [k, v] of Object.entries(o.pos as Record<string, unknown>).slice(0, 24)) {
+    for (const [k, v] of Object.entries(o.pos as Record<string, unknown>).slice(0, 32)) {
       if (!KEY.test(k) || !v || typeof v !== "object") continue;
       const p = v as Record<string, unknown>;
       pos[k] = { x: num(p.x, 0, 1, 0.1), y: num(p.y, 0, 1, 0.1), r: num(p.r, -15, 15, 0) };

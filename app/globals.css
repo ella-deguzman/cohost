@@ -299,7 +299,7 @@ body main.quiet-page .board{
 .pc-hand{font-family:'Bradley Hand','Segoe Print','Noteworthy','Marker Felt','Comic Sans MS',cursive;font-size:1.15em;line-height:1.3;color:#4a4234;display:block;overflow-wrap:anywhere}
 
 /* masking tape that holds the label and the photo */
-.pc-label:before,.pc-polaroid:before{
+.pc-label:before,.pc-print:before{
   content:'';position:absolute;left:50%;top:-.8em;width:5.5em;height:1.7em;margin-left:-2.75em;z-index:2;
   transform:rotate(-2deg);background:#e6dcbfcc;
   clip-path:polygon(0 0,3% 20%,0 40%,3% 60%,0 80%,3% 100%,100% 100%,97% 80%,100% 60%,97% 40%,100% 20%,97% 0);
@@ -352,10 +352,42 @@ body main.quiet-page .board{
 .pc-pin small{margin-bottom:.3em}
 .pc-pinhead{position:absolute;left:50%;top:-.6em;width:1.2em;height:1.2em;margin-left:-.6em;border-radius:50%;background:radial-gradient(circle at 35% 30%,#e8a595,#9a3f2f 70%);box-shadow:0 .25em .3em #3b34284d}
 
-/* description: polaroid with a spot for a photo later */
-.pc-polaroid{width:11em;padding:.7em .7em 1em;background:#fffefb;border:1px solid #ebe5d3}
-.pc-photo{display:grid;place-items:center;aspect-ratio:1/1;background:#efeadc;border:.1em dashed #cdbf99;color:#a39a82;font:italic .72em Georgia,serif;text-align:center}
-.pc-polaroid .pc-hand{margin-top:.7em;font-size:1em}
+/* description: lined index card */
+.pc-card{
+  width:12em;min-height:7.5em;padding:1.1em 1em 1em;border:1px solid #e6dec8;
+  background:linear-gradient(#e08f87,#e08f87) 0 2.35em/100% 1px no-repeat,
+    repeating-linear-gradient(180deg,transparent 0,transparent 1.5em,#b7c9d8 1.5em,#b7c9d8 calc(1.5em + 1px)) 0 2.7em/100% 100% no-repeat,
+    #fffdf4;
+}
+.pc-card small{margin-bottom:1.35em}
+.pc-card .pc-hand{font-size:1.05em;line-height:1.5em}
+
+/* inspiration photos: taped prints */
+.pc-print{width:9.5em;padding:0;background:none;border:0}
+.pc-print img{display:block;width:100%;height:auto;aspect-ratio:var(--ar,1);object-fit:cover;background:#efeadc;pointer-events:none;-webkit-user-drag:none}
+.pc-x{
+  position:absolute;right:-.7em;top:-.7em;z-index:3;width:1.9em;height:1.9em;padding:0;border:0;border-radius:50%;
+  background:#4a4234;color:#fffdf6;font:700 1.1em/1 Arial,sans-serif;opacity:0;cursor:pointer;transition:opacity .15s;
+}
+.pc:hover .pc-x,.pc:focus-within .pc-x,.pc-x:focus-visible{opacity:1}
+@media(hover:none){.pc-x{opacity:1;width:2.6em;height:2.6em}}
+
+/* dragging photos in from the desktop */
+.board-drop{
+  display:none;position:absolute;inset:3%;z-index:50;place-items:center;border:2px dashed #8a7d5c;border-radius:4px;
+  background:#fffaf0d9;font:italic 15px Georgia,serif;color:#6b5f44;pointer-events:none;
+}
+main.quiet-page.drop-on .board-drop{display:grid}
+body main.quiet-page .guided .dropzone{
+  margin-top:6px;padding:22px 16px;border:1.5px dashed #bfb18c;border-radius:4px;background:#fbf7ea;
+  text-align:center;color:#7a6a44;display:flex;flex-direction:column;align-items:center;gap:10px;
+}
+body main.quiet-page .guided .dropzone.over{background:#f3ead0;border-color:#8a7d5c}
+body main.quiet-page .guided .dropzone.busy{opacity:.7}
+body main.quiet-page .guided .dropzone p{margin:0;font:italic 14px Georgia,serif}
+body main.quiet-page .guided .dropzone button{padding:9px 16px;border:1px solid #8a7d5c;border-radius:3px;background:#fffdf6;color:#4a4234;font:600 12px Arial,sans-serif;letter-spacing:.08em;cursor:pointer}
+body main.quiet-page .guided .dropzone button:disabled{opacity:.5;cursor:default}
+body main.quiet-page .guided .dropzone small{font:11px Arial,sans-serif;color:#8c7f62}
 
 /* notes: sticky note */
 .pc-sticky{width:9.5em;min-height:8.5em;padding:1em .9em;background:linear-gradient(180deg,#f4eab9,#efe3a8)}

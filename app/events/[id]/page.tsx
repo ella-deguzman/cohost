@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import PlannerForm from "@/components/PlannerForm";
 import { requireUser } from "@/lib/auth";
 import { getEvent, rowToInput } from "@/lib/events";
+import { listPhotos } from "@/lib/photos";
 
 export default async function EditEventPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
@@ -12,5 +13,7 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
   const event = await getEvent(id, user.id);
   if (!event) notFound();
 
-  return <PlannerForm initial={{ id: event.id, version: event.plan_version, input: rowToInput(event) }} />;
+  const photos = await listPhotos(event.id, user.id);
+
+  return <PlannerForm initial={{ id: event.id, version: event.plan_version, input: rowToInput(event), photos }} />;
 }

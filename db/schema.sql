@@ -59,3 +59,15 @@ create table if not exists event_members (
 );
 create unique index if not exists one_host_per_event
   on event_members (event_id) where role = 'host';
+
+-- Inspiration photos for the idea board. Stored in the database as small JPEGs
+-- (the browser shrinks them first), so there is nothing else to set up.
+create table if not exists event_photos (
+  id         uuid primary key default gen_random_uuid(),
+  event_id   uuid not null references events(id) on delete cascade,
+  data       bytea not null,
+  width      integer not null check (width between 1 and 4000),
+  height     integer not null check (height between 1 and 4000),
+  created_at timestamptz not null default now()
+);
+create index if not exists event_photos_event_idx on event_photos (event_id, created_at);

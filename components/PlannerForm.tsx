@@ -12,14 +12,14 @@ import {
   type ReactNode,
 } from "react";
 import { saveEvent, type SaveResult } from "@/app/events/actions";
-import { OCCASIONS, VIBES, defaultPos, type PiecePos } from "@/lib/collage";
+import { MAX_PHOTOS, OCCASIONS, VIBES, defaultPos, type Photo, type PiecePos } from "@/lib/collage";
 import { EMPTY_EVENT, type EventInput } from "@/lib/validate";
 
-type Initial = { id: string; version: number; input: EventInput };
+type Initial = { id: string; version: number; input: EventInput; photos?: Photo[] };
 
-/** Seven questions, then a "saved" page. */
-const LAST = 7;
-const DOT_LABELS = ["", "Name", "Occasion", "Vibe", "Size", "When", "Where", "Story"];
+/** Eight questions, then a "saved" page. */
+const LAST = 8;
+const DOT_LABELS = ["", "Name", "Occasion", "Vibe", "Size", "When", "Where", "Story", "Inspiration"];
 
 const EXAMPLE: EventInput = {
   ...EMPTY_EVENT,
@@ -32,6 +32,28 @@ const EXAMPLE: EventInput = {
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s);
+
+/** Shrinks a photo to a small JPEG in the browser, so uploads stay quick and light. */
+async function shrink(file: File): Promise<{ blob: Blob; w: number; h: number }> {
+  const bmp = await createImageBitmap(file);
+  const scale = Math.min(1, 900 / Math.max(bmp.width, bmp.height));
+  const w = Math.max(1, Math.round(bmp.width * scale));
+  const h = Math.max(1, Math.round(bmp.height * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("no canvas");
+  ctx.fillStyle = "#ffffff"; // transparent PNGs get a white background
+  ctx.fillRect(0, 0, w, h);
+  ctx.drawImage(bmp, 0, 0, w, h);
+  bmp.close();
+  const blob = await new Promise<Blob | null>((done) => canvas.toBlob(done, "image/jpeg", 0.82));
+  if (!blob) throw new Error("no jpeg");
+  return { blob, w, h };
+}
+
+const hasFiles = (e: React.DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes("Files");
 
 function prettyTime(t: string): string {
   const [h, m] = t.split(":").map(Number);
@@ -143,12 +165,12 @@ function buildPieces(f: EventInput): Piece[] {
   if (f.description.trim()) {
     out.push({
       key: "story",
-      cls: "pc-polaroid",
+      cls: "pc-card",
       label: "Description",
       node: (
         <>
-          <span className="pc-photo">your photo here</span>
-          <span className="pc-hand">{clip(f.description.trim(), 80)}</span>
+          <small>THE IDEA</small>
+          <span className="pc-hand">{clip(f.description.trim(), 90)}</span>
         </>
       ),
     });
@@ -172,6 +194,12 @@ export default function PlannerForm({ initial }: { initial?: Initial }) {
   const [pending, startTransition] = useTransition();
   const [dragging, setDragging] = useState<string | null>(null);
   const [z, setZ] = useState<Record<string, number>>({});
+  const [photos, setPhotos] = useState<Photo[]>(initial?.photos ?? []);
+  const [uploading, setUploading] = useState(false);
+  const [dropping, setDropping] = useState(false);
+  const photosRef = useRef(photos);
+  photosRef.current = photos;
+  const fileInput = useRef<HTMLInputElement>(null);
 
   // Latest values for code that runs later (timers, the save queue).
   const fRef = useRef(f);
@@ -212,6 +240,19 @@ export default function PlannerForm({ initial }: { initial?: Initial }) {
 
   useEffect(() => () => {
     if (persistTimer.current) clearTimeout(persistTimer.current);
+  }, []);
+
+  // A photo dropped outside the folder would make the browser leave the page and lose the draft.
+  useEffect(() => {
+    const stop = (e: DragEvent) => {
+      if (Array.from(e.dataTransfer?.types ?? []).includes("Files")) e.preventDefault();
+    };
+    window.addEventListener("dragover", stop);
+    window.addEventListener("drop", stop);
+    return () => {
+      window.removeEventListener("dragover", stop);
+      window.removeEventListener("drop", stop);
+    };
   }, []);
 
   /**
@@ -265,6 +306,87 @@ export default function PlannerForm({ initial }: { initial?: Initial }) {
     });
   const setPiecePos = (key: string, pos: PiecePos) =>
     setF((p) => ({ ...p, collage: { ...p.collage, pos: { ...p.collage.pos, [key]: pos } } }));
+
+  // ---- inspiration photos ----
+  async function addFiles(input: FileList | File[]) {
+    const images = Array.from(input).filter((file) => file.type.startsWith("image/"));
+    if (!images.length) {
+      setError("Those don't look like photos. Try JPG, PNG or WebP.");
+      return;
+    }
+    const room = MAX_PHOTOS - photosRef.current.length;
+    if (room <= 0) {
+      setError(`The board holds up to ${MAX_PHOTOS} photos. Remove one to add another.`);
+      return;
+    }
+    setError("");
+    setUploading(true);
+    try {
+      // Photos belong to a saved draft, so make sure one exists first.
+      if (!idRef.current) {
+        const r = await runSave();
+        if (!r.ok) {
+          setError(r.error);
+          return;
+        }
+      }
+      let failed = "";
+      for (const file of images.slice(0, room)) {
+        try {
+          const { blob, w, h } = await shrink(file);
+          const body = new FormData();
+          body.append("file", blob, "photo.jpg");
+          body.append("w", String(w));
+          body.append("h", String(h));
+          const res = await fetch(`/events/${idRef.current}/photos`, { method: "POST", body });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            failed = data.error || "We couldn't add that photo.";
+            continue;
+          }
+          setPhotos((p) => [...p, data as Photo]);
+        } catch {
+          failed = "We couldn't read one of those photos. Try a JPG or PNG.";
+        }
+      }
+      if (failed) setError(failed);
+      else if (images.length > room) setError(`Added what fits. The board holds up to ${MAX_PHOTOS} photos.`);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function removePhoto(id: string) {
+    try {
+      const res = await fetch(`/photos/${id}`, { method: "DELETE" });
+      if (!res.ok && res.status !== 404) throw new Error("delete failed");
+    } catch {
+      setError("We couldn't remove that photo. Please try again.");
+      return;
+    }
+    setPhotos((p) => p.filter((x) => x.id !== id));
+    setF((p) => {
+      const pos = { ...p.collage.pos };
+      delete pos[`photo:${id}`];
+      return { ...p, collage: { ...p.collage, pos } };
+    });
+    persistSoon();
+  }
+
+  function onDragOverFiles(e: React.DragEvent) {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    setDropping(true);
+  }
+  function onDragLeaveFiles(e: React.DragEvent) {
+    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropping(false);
+  }
+  function onDropFiles(e: React.DragEvent) {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    setDropping(false);
+    void addFiles(e.dataTransfer.files);
+  }
 
   // ---- dragging pieces around the board ----
   function onDown(e: ReactPointerEvent<HTMLDivElement>, key: string, cur: PiecePos) {
@@ -320,14 +442,47 @@ export default function PlannerForm({ initial }: { initial?: Initial }) {
     else if (e.key === "ArrowDown") next = { ...cur, y: clamp(cur.y + nudge, 0, maxY) };
     else if (e.key === ",") next = { ...cur, r: clamp(cur.r - 2, -15, 15) };
     else if (e.key === ".") next = { ...cur, r: clamp(cur.r + 2, -15, 15) };
-    if (!next) return;
+    if (!next) {
+      if ((e.key === "Delete" || e.key === "Backspace") && key.startsWith("photo:") && e.target === e.currentTarget) {
+        e.preventDefault();
+        void removePhoto(key.slice(6));
+      }
+      return;
+    }
     e.preventDefault();
     setPiecePos(key, next);
     persistSoon();
   }
 
-  const pieces = buildPieces(f);
+  const pieces: Piece[] = [
+    ...buildPieces(f),
+    ...photos.map((ph) => ({
+      key: `photo:${ph.id}`,
+      cls: "pc-print",
+      label: "Inspiration photo",
+      node: (
+        <>
+          <img
+            src={`/photos/${ph.id}`}
+            alt="Inspiration photo"
+            draggable={false}
+            style={{ "--ar": String(clamp(ph.w / ph.h, 0.6, 1.7)) } as CSSProperties}
+          />
+          <button
+            type="button"
+            className="pc-x"
+            aria-label="Remove this photo"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={() => void removePhoto(ph.id)}
+          >
+            ×
+          </button>
+        </>
+      ),
+    })),
+  ];
   let vibeIndex = 0;
+  let photoIndex = 0;
 
   const hasValue: Record<number, boolean> = {
     1: !!f.title.trim(),
@@ -337,6 +492,7 @@ export default function PlannerForm({ initial }: { initial?: Initial }) {
     5: !!(f.eventDate || f.eventTime),
     6: !!f.location.trim(),
     7: !!(f.description.trim() || f.notes.trim()),
+    8: photos.length > 0,
   };
 
   const money = f.budget ? Number(f.budget).toLocaleString("en-US", { style: "currency", currency: "USD" }) : "";
@@ -555,13 +711,47 @@ export default function PlannerForm({ initial }: { initial?: Initial }) {
             />
           </>
         );
+      case 8:
+        return (
+          <>
+            <h2 tabIndex={-1}>Any inspiration?</h2>
+            <p className="intro">
+              Drag photos anywhere onto this folder, or choose them below. They land on your board. Totally optional.
+            </p>
+            <div className={`dropzone${dropping ? " over" : ""}${uploading ? " busy" : ""}`}>
+              <p>{uploading ? "Adding your photos…" : "Drop photos here"}</p>
+              <button type="button" onClick={() => fileInput.current?.click()} disabled={uploading || photos.length >= MAX_PHOTOS}>
+                Choose photos
+              </button>
+              <small>
+                {photos.length} of {MAX_PHOTOS} added
+              </small>
+              <input
+                ref={fileInput}
+                hidden
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={(e) => {
+                  if (e.target.files?.length) void addFiles(e.target.files);
+                  e.target.value = "";
+                }}
+              />
+            </div>
+          </>
+        );
       default:
         return null;
     }
   }
 
   return (
-    <main className="quiet-page">
+    <main
+      className={`quiet-page${dropping ? " drop-on" : ""}`}
+      onDragOver={onDragOverFiles}
+      onDragLeave={onDragLeaveFiles}
+      onDrop={onDropFiles}
+    >
       <div className="folder-inside-label" aria-hidden="true">CO-HOST / EVENT PLANNING FILE</div>
 
       <section className="workspace guided">
@@ -645,7 +835,7 @@ export default function PlannerForm({ initial }: { initial?: Initial }) {
 
       <div className="board" ref={boardRef} role="group" aria-label="Your idea board. Drag the pieces to arrange them.">
         {pieces.map((p) => {
-          const idx = p.key.startsWith("vibe:") ? vibeIndex++ : 0;
+          const idx = p.key.startsWith("vibe:") ? vibeIndex++ : p.key.startsWith("photo:") ? photoIndex++ : 0;
           const pos = f.collage.pos[p.key] ?? defaultPos(p.key, idx);
           return (
             <div
@@ -665,6 +855,9 @@ export default function PlannerForm({ initial }: { initial?: Initial }) {
             </div>
           );
         })}
+        <div className="board-drop" aria-hidden="true">
+          Drop photos to add them
+        </div>
       </div>
     </main>
   );
